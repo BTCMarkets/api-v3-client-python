@@ -10,21 +10,25 @@ base_url = 'https://api.btcmarkets.net'
 
 
 def makeHttpCall(method, apiKey, privateKey, path, queryString, data=None):
+    if data is not None:
+        data = json.dumps(data)
+
     headers = buildHeaders(method, apiKey, privateKey, path, data)
     fullPath = ''
     if queryString is None:
         fullPath = path
     else:
         fullPath = path + '?' + queryString
-    try:
-        http_request = Request(base_url + fullPath, data, headers)
 
-        if method == 'post' or method == 'put':
-            response = urlopen(http_request, data)
+    try:
+        http_request = Request(base_url + fullPath, data, headers, method = method)
+
+        if method == 'POST' or method == 'PUT':
+            response = urlopen(http_request, data = bytes(data, encoding="utf-8"))
         else:
             response = urlopen(http_request)
 
-            return json.loads(str(response.read(), "utf-8"))
+        return json.loads(str(response.read(), "utf-8"))
     except URLError as e:
         errObject = json.loads(e.read())
         if hasattr(e, 'code'):
@@ -69,13 +73,29 @@ class BTCMarkets:
 
     def get_orders(self):
 
-        return makeHttpCall('GET', self.apiKey, self.privateKey, '/v3/orders', 'status=open')
+        return makeHttpCall('GET', self.apiKey, self.privateKey, '/v3/orders', 'status=all')
 
+    def place_new_order(self):
+
+        model = {
+            'marketId': 'BTC-AUD',
+            'price': '100.12',
+            'amount': '1.034',
+            'type': 'Limit',
+            'side': 'Bid'
+        }
+
+        return makeHttpCall('POST', self.apiKey, self.privateKey, '/v3/orders', None, model)
+
+    def cancel_order(self):
+
+        return makeHttpCall('DELETE', self.apiKey, self.privateKey, '/v3/orders', 'id=1224905')
 
 api_key = 'add api key here'
 private_key = 'add private key here'
 
 client = BTCMarkets(api_key, private_key)
 
-print(client.get_orders())
-
+# print(client.get_orders())
+# print(client.place_new_order())
+# print(client.cancel_order())
