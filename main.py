@@ -9,7 +9,7 @@ if __name__ == "__main__":
         exit(1)
     btcmarkets_client = BTCMarketsClient(api_key, private_key)
     print (btcmarkets_client.get_withdrawals())
-    #print(btcmarkets_client.create_sample_withdrawal_reqeust())
+    #print(btcmarkets_client.create_sample_withdrawal_request())
     #print(btcmarkets_client.get_orders())
     #print(btcmarkets_client.place_sample_order())
     #print(btcmarkets_client.cancel_order())
