@@ -1,93 +1,75 @@
-import base64
-import hashlib
-import hmac
-import time
+"""A minimal HTTP client for the BTC Markets API v3.
+
+It sends the request and attaches the headers from an authentication scheme in
+``auth.py``, so the same calls work with either scheme::
+
+    client = BTCMarketsClient(Ed25519Auth(key_id, private_key, 'api.btcmarkets.net'))
+    client = BTCMarketsClient(HmacAuth(api_key, secret))
+"""
 import json
-from urllib.request import urlopen, Request
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+DEFAULT_BASE_URL = 'https://api.btcmarkets.net'
+
 
 class BTCMarketsClient:
-    def __init__(self, api_key, private_key):
-        self.base_url = 'https://api.btcmarkets.net'
-        self.api_key = api_key
-        self.private_key = base64.b64decode(private_key)
+    def __init__(self, auth, base_url=DEFAULT_BASE_URL):
+        self.auth = auth
+        self.base_url = base_url.rstrip('/')
+
+    def get_balances(self):
+        return self.request('GET', '/v3/accounts/me/balances')
 
     def get_orders(self):
-        return self.__make_http_call('GET', self.api_key, self.private_key, '/v3/orders', 'status=all')
+        return self.request('GET', '/v3/orders', 'status=all')
 
     def place_sample_order(self):
-        payload = {
+        return self.request('POST', '/v3/orders', body={
             'marketId': 'BTC-AUD',
             'price': '100.12',
-            'amount': '0.0034',
+            'amount': '1.034',
             'type': 'Limit',
-            'side': 'Bid'
-        }
-        return self.__make_http_call('POST', self.api_key, self.private_key, '/v3/orders', None, payload)
-
-    def create_sample_withdrawal_reqeust(self):
-        payload = {
-            'assetName': 'USDT',
-            'amount': '0.01',
-            'toAddress': 'wrong address'
-        }
-        return self.__make_http_call('POST', self.api_key, self.private_key, '/v3/withdrawals', None, payload)
-
+            'side': 'Bid',
+        })
 
     def cancel_order(self):
-        return self.__make_http_call('DELETE', self.api_key, self.private_key, '/v3/orders', 'id=1224905')
+        return self.request('DELETE', '/v3/orders', 'id=1224905')
 
     def get_withdrawals(self):
-        return self.__make_http_call('GET', self.api_key, self.private_key, '/v3/withdrawals', '')
+        return self.request('GET', '/v3/withdrawals')
 
+    def create_sample_withdrawal_request(self):
+        return self.request('POST', '/v3/withdrawals', body={
+            'assetName': 'USDT',
+            'amount': '0.01',
+            'toAddress': 'wrong address',
+        })
 
-    def __make_http_call(self, method, apiKey, privateKey, path, queryString, data=None):
-        if data is not None:
-            data = json.dumps(data)
+    def request(self, method, path, query_string=None, body=None):
+        """Make one authenticated request and return the parsed JSON response.
 
-        headers = self.___build_headers(method, apiKey, privateKey, path, data)
-        if queryString is None:
-            full_path = path
-        else:
-            full_path = path + '?' + queryString
-        try:
-            http_request = Request(self.base_url + full_path, data, headers, method=method)
+        ``path`` is the request path without the query string (e.g. ``/v3/orders``);
+        this is what gets signed. ``query_string`` (e.g. ``status=all``) is appended to
+        the URL only. On an HTTP error the error body is returned with ``statusCode`` added.
+        """
+        # Serialise once: the exact string that is signed must be the one that is sent.
+        data = json.dumps(body) if body is not None else None
 
-            if method == 'POST' or method == 'PUT':
-                response = urlopen(http_request, data = bytes(data, encoding="utf-8"))
-            else:
-                response = urlopen(http_request)
-
-            return json.loads(str(response.read(), "utf-8"))
-        except URLError as e:
-            errObject = json.loads(e.read())
-            if hasattr(e, 'code'):
-                errObject['statusCode'] = e.code
-
-            return errObject
-
-
-    def ___build_headers(self, method, api_key, private_key, path, data):
-        now = str(int(time.time() * 1000))
-        message = method + path + now
-        if data is not None:
-            message += data
-
-        signature = self.__sign_message(private_key, message)
         headers = {
-            "Accept": "application/json",
-            "Accept-Charset": "UTF-8",
-            "Content-Type": "application/json",
-            "BM-AUTH-APIKEY": api_key,
-            "BM-AUTH-TIMESTAMP": now,
-            "BM-AUTH-SIGNATURE": signature
+            'Accept': 'application/json',
+            'Accept-Charset': 'UTF-8',
+            'Content-Type': 'application/json',
+            'User-Agent': 'btcmarkets-api-v3-client-python',
         }
-        return headers
+        headers.update(self.auth.headers(method, path, data))
 
-    def __sign_message(self, private_key, message):
-        signature = base64.b64encode(hmac.new(
-            private_key, message.encode('utf-8'), digestmod=hashlib.sha512).digest())
-        signature = signature.decode('utf8')
-        return signature
-
-
+        url = self.base_url + path + ('?' + query_string if query_string else '')
+        http_request = Request(url, data.encode('utf-8') if data else None, headers, method=method)
+        try:
+            with urlopen(http_request) as response:
+                return json.loads(response.read() or b'{}')
+        except HTTPError as e:
+            error = json.loads(e.read() or b'{}')
+            error['statusCode'] = e.code
+            return error
