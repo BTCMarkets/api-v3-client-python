@@ -92,20 +92,14 @@ class HmacAuth:
         }
 
 
-def load_private_key(text):
-    """Parse an Ed25519 private key from the text you were given or generated.
+def load_private_key(pem):
+    """Parse an Ed25519 private key from PKCS#8 PEM (``-----BEGIN PRIVATE KEY-----``).
 
-    Accepts either form:
-
-    * PKCS#8 PEM (``-----BEGIN PRIVATE KEY-----``), as written by ``generate_key.py``.
-      Escaped ``\\n`` sequences, as left by some shells, are tolerated.
-    * Base64 of the raw key bytes: the 32-byte seed, or seed + 32-byte public key.
+    This is the format shown by the BTC Markets website and written by ``generate_key.py``.
+    The website shows the newlines as ``\\n``; both that and real newlines are accepted.
     """
-    text = text.strip().replace('\\n', '\n')
-    if text.startswith('-----BEGIN'):
-        key = load_pem_private_key(text.encode('utf-8'), password=None)
-    else:
-        key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(text)[:32])
+    pem = pem.strip().replace('\\n', '\n')
+    key = load_pem_private_key(pem.encode('utf-8'), password=None)
     if not isinstance(key, Ed25519PrivateKey):
         raise ValueError('not an Ed25519 private key')
     return key

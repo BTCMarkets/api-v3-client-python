@@ -31,8 +31,9 @@ pip install -r requirements.txt
 Pick one of the two options.
 
 **Option A: let BTC Markets generate the key pair.** On the BTC Markets website, create
-an API key with the Ed25519 type. You are shown the API key id (`btcm_...`) and your
-private key. Save the private key securely; it is shown only once.
+an API key with the Ed25519 type. You are shown the API key id (`key`, `btcm_...`) and
+your private key (`privateKey`, a PEM string starting `-----BEGIN PRIVATE KEY-----`).
+Save the private key securely; it is shown only once.
 
 **Option B: generate the key pair yourself.** Only the public key is ever sent to
 BTC Markets.
@@ -58,9 +59,12 @@ commit it to source control.
 
 ```bash
 export BTCMARKETS_API_KEY=btcm_...                                # your API key id
-export BTCMARKETS_PRIVATE_KEY="$(cat btcmarkets_ed25519.pem)"    # or paste the key shown by the website
+export BTCMARKETS_PRIVATE_KEY="$(cat btcmarkets_ed25519.pem)"    # or paste the PEM shown by the website
 python main.py
 ```
+
+`main.py` reads your wallet balances (`GET /v3/accounts/me/balances`) and prints them.
+Other sample calls are commented out at the bottom of the file.
 
 ### How a request is signed
 

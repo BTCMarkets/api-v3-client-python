@@ -28,7 +28,8 @@ if __name__ == '__main__':
         auth = HmacAuth(api_key, private_key)
 
     client = BTCMarketsClient(auth, base_url)
-    print(client.get_withdrawals())
+    print(client.get_balances())
+    # print(client.get_withdrawals())
     # print(client.get_orders())
     # print(client.place_sample_order())
     # print(client.cancel_order())

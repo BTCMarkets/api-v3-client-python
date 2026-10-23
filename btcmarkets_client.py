@@ -18,6 +18,9 @@ class BTCMarketsClient:
         self.auth = auth
         self.base_url = base_url.rstrip('/')
 
+    def get_balances(self):
+        return self.request('GET', '/v3/accounts/me/balances')
+
     def get_orders(self):
         return self.request('GET', '/v3/orders', 'status=all')
 
